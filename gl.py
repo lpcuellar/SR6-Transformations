@@ -3,7 +3,7 @@
 ##  GRÁFICAS POR COMPUTADORA
 ##  SECCIÓN 20
 ##
-##  SR5: Textures
+##  SR6: TRANSFORMATIONS
 ##  LUIS PEDRO CUÉLLAR - 18220
 ##
 
@@ -35,21 +35,21 @@ def color(r, g, b):
 class Render(object):
     def __init__(self, width, height, background = None):
         self.glInit(width, height, background)
-        self.current_color = color(1, 1, 1)
 
     ##  initiates the image with the width, height and background color
     def glInit(self, width, height, background):
         background = color(0, 0, 0) if background == None else background
-
         self.bg_color = background
 
         self.glCreateWindow(width, height)
 
-        self.mathGl = MathGl()
+        self.current_color = color(1, 1, 1)
 
         self.light = [0, 0, 1]
         self.current_texture = None
         self.current_shader = None
+
+        self.mathGl = MathGl()
 
         self.createViewMatrix()
         self.createProjectionMatrix()
@@ -61,50 +61,11 @@ class Render(object):
         self.glClear(self.bg_color)
         self.glViewPort(0, 0, width, height)
 
-    def createViewMatrix(self, camera_position = [0, 0, 0], camera_rotation = [0, 0, 0]):
-        camera_matrix = self.createObjectMatrix(translate = camera_position, rotate = camera_rotation)
-        self.viewMatrix = self.mathGl.invert_matrix(camera_matrix)
-
-    def lookAt(self, eye, camera_position = [0, 0, 0]):
-        forward = self.mathGl.subtract(camera_position, eye)
-        forward_norm = self.mathGl.norm(forward)
-
-        for i in range(len(forward)) :
-            forward[i] = forward[i] / forward_norm[i]
-
-        right = self.mathGl.cross([0, 1, 0], forward)
-        right_norm = self.mathGl.norm(right)
-
-        for i in range(len(right)) :
-            right[i] = right[i] = right[i] / right_norm[i]
-
-        up = self.mathGl.cross([0, 1, 0], right)
-        up_norm = self.mathGl.norm(up)
-
-        for i in range(len(up)) :
-            up[i] = up[i] / up_norm[i]
-
-        camera_matrix = [ [right[0], up[0], forward[0], camera_position[0]],
-                          [right[1], up[1], forward[1], camera_position[1]],
-                          [right[2], up[2], forward[2], camera_position[2]],
-                          [0, 0, 0, 1]]
-
-        self.viewMatrix = self.mathGl.invert_matrix(camera_matrix)
-
-    def createProjectionMatrix(self, n = 0.1, f = 1000, fov = 60):
-        t = tan((fov * np.pi / 180) / 2) * n
-        r = t * self.vp_width / self.vp_height
-
-        self.projectionMatrix = [ [n / r, 0, 0, 0],
-                                  [0, n / t, 0, 0],
-                                  [0, 0, -(f + n) / (f - n), -(2 * f * n) / (f - n)],
-                                  [0, 0, -1, 0] ]
-
     ##  colors the image with the background color
     def glClear(self, bg_color):
         self.bg_color = bg_color
         self.pixels = [ [ self.bg_color for x in range(self.width)] for y in range(self.height) ]
-        self.zbuffer = [ [ -float('inf') for x in range(self.width)] for y in range(self.height) ]
+        self.zbuffer = [ [ float('inf') for x in range(self.width)] for y in range(self.height) ]
 
     ##  defines an area inside the window in which it can be drawn points and lines
     def glViewPort(self, x, y, width, height):
@@ -113,10 +74,10 @@ class Render(object):
          self.vp_width = width
          self.vp_height = height
 
-         self.viewPortMatrix = [ [width / 2, 0, 0, x + width / 2],
-                                 [0, height / 2, 0, y + height / 2],
-                                 [0, 0, 0.5, 0.4],
-                                 [0, 0, 0, 1] ]
+         self.viewport_matrix = [ [width / 2, 0, 0, x + width / 2],
+                                  [0, height / 2, 0, y + height / 2],
+                                  [0, 0, 0.5, 0.5],
+                                  [0, 0, 0, 1] ]
 
     ##   changes de background color of the image
     def glClearColor(self, r, g, b):
@@ -127,6 +88,41 @@ class Render(object):
         self.bg_color = color(self.r, self.g, self.b)
 
         self.glClear(self.bg_color)
+
+    def createViewMatrix(self, camera_position = [0, 0, 0], camera_rotation = [0, 0, 0]):
+        camera_matrix = self.createObjectMatrix(translate = camera_position, rotate = camera_rotation)
+        # self.view_matrix = self.mathGl.getMatrixInverse(camera_matrix)
+        self.view_matrix = np.linalg.inv(camera_matrix)
+
+    def lookAt(self, eye, camera_position = [0, 0, 0]):
+        forward = self.mathGl.subtract(camera_position, eye)
+        norm_forward = self.mathGl.norm(forward)
+        forward = self.mathGl.divMatrix(forward, norm_forward)
+
+        right = self.mathGl.cross([0, 1, 0], forward)
+        norm_right = self.mathGl.norm(right)
+        right        = self.mathGl.divMatrix(right, norm_right)
+
+        up = self.mathGl.cross(forward, right)
+        norm_up = self.mathGl.norm(up)
+        up = self.mathGl.divMatrix(up, norm_up)
+
+        camera_matrix = [ [right[0], up[0], forward[0], camera_position[0]],
+                          [right[1], up[1], forward[1], camera_position[1]],
+                          [right[2], up[2], forward[2], camera_position[2]],
+                          [0, 0, 0, 1] ]
+
+        # self.view_matrix = self.mathGl.getMatrixInverse(camera_matrix)
+        self.view_matrix = np.linalg.inv(camera_matrix)
+
+    def createProjectionMatrix(self, n = 0.1, f = 1000, fov = 60):
+        t = tan((fov * np.pi / 180) / 2) * n
+        r = t * self.vp_width / self.vp_height
+
+        self.projection_matrix = [ [n / r, 0, 0, 0],
+                                   [0, n / t, 0, 0],
+                                   [0, 0, -(f + n) / (f - n), -(2 * f * n) / (f - n)],
+                                   [0, 0, -1, 0] ]
 
     ##  draws a point in the image with the given NDC coordinates
     def glVertex(self, x, y):
@@ -220,7 +216,7 @@ class Render(object):
                 if offset >= limit :
                     y += 1 if y0 < y1 else -1
                     limit += 1
-
+    #
     # def transform(self, vertex, scale = [1, 1, 1], translate = [0, 0, 0]) :
     #     transformed =[  round(vertex[0] * scale[0] + translate[0]),
     #                     round(vertex[1] * scale[1] + translate[1]),
@@ -228,90 +224,95 @@ class Render(object):
     #     return transformed
 
     def transform(self, vertex, vMatrix):
-        augVertex = [vertex[0], vertex[1], vertex[2], 1]
-        first_multiply = self.mathGl.matrix_multiply(self.viewPortMatrix, self.projectionMatrix)
-        second_multiply = self.mathGl.matrix_multiply(first_multiply, self.viewMatrix)
-        third_multiply = self.mathGl.matrix_multiply(second_multiply, vMatrix)
-        transVertex = self.mathGl.matrix_multiply(third_multiply, augVertex)
+        aug_vertex = [vertex[0], vertex[1], vertex[2], 1]
 
-        transVertex =  transVertex.tolist()[0]
+        # first = self.mathGl.getMatricesProduct(self.viewport_matrix, self.projection_matrix)
+        # second = self.mathGl.getMatricesProduct(first, self.view_matrix)
+        # third = self.mathGl.getMatricesProduct(second, vMatrix)
+        # trans_vertex = self.mathGl.getMVProduct(aug_vertex, third)
 
-        transVertex = [transVertex[0] / transVertex[3], transVertex[1] / transVertex[3], transVertex[2] / transVertex[3]]
+        trans_vertex = self.mathGl.getMVProduct(aug_vertex, self.mathGl.getMatricesProduct(self.mathGl.getMatricesProduct(self.mathGl.getMatricesProduct(self.viewport_matrix, self.projection_matrix), self.view_matrix), vMatrix))
 
-        return transVertex
+        trans_vertex = [trans_vertex[0] / trans_vertex[3],
+                        trans_vertex[1] / trans_vertex[3],
+                        trans_vertex[2] / trans_vertex[3]]
+
+        return trans_vertex
 
     def dirTransform(self, vertex, vMatrix):
-        augVertex = [vertex[0], vertex[1], vertex[2], 0]
-        transVertex = self.mathGl.matrix_multiply(vMatrix, augVertex)
-        transVertex = transVertex.tolist()[0]
+        aug_vertex = [vertex[0], vertex[1], vertex[2], 0]
 
-        transVertex = [transVertex[0], transVertex[1], transVertex[2]]
+        trans_vertex = self.mathGl.getMVProduct(aug_vertex, vMatrix)
 
-        return transVertex
+        trans_vertex = [trans_vertex[0], trans_vertex[1], trans_vertex[2]]
+
+        return trans_vertex
 
     def createObjectMatrix(self, translate = [0, 0, 0], scale = [1, 1, 1], rotate = [0, 0, 0]):
-        translateMatrix = [ [1, 0, 0, translate[0]],
-                            [0, 1, 0, translate[1]],
-                            [0, 0, 1, translate[2]],
-                            [0, 0, 0, 1] ]
+        translate_matrix = [ [1, 0, 0, translate[0]],
+                             [0, 1, 0, translate[1]],
+                             [0, 0, 1, translate[2]],
+                             [0, 0, 0, 1] ]
 
-        scaleMatrix = [ [scale[0], 0, 0, 0],
-                        [0, scale[1], 0, 0],
-                        [0, 0, scale[2], 0],
-                        [0, 0, 0, 1] ]
+        scale_matrix = [ [scale[0], 0, 0, 0],
+                         [0, scale[1], 0, 0],
+                         [0, 0, scale[2], 0],
+                         [0, 0, 0, 1] ]
 
-        rotationMatrix = self.createRotationMatrix(rotate)
+        rotation_matrix = self.createRotationMatrix(rotate)
 
-        first = self.mathGl.matrix_multiply(translateMatrix, rotationMatrix)
-        second = self.mathGl.matrix_multiply(first, scaleMatrix)
-
-        return second
+        # first = self.mathGl.getMatricesProduct(translate_matrix, rotation_matrix)
+        # result = self.mathGl.getMatricesProduct(first, scale_matrix)
+        return  self.mathGl.getMatricesProduct(self.mathGl.getMatricesProduct(translate_matrix, rotation_matrix), scale_matrix)
 
     def createRotationMatrix(self, rotate = [0, 0, 0]):
-        pitch = rotate[0] * (np.pi / 180)
-        yaw = rotate[1] * (np.pi / 180)
-        roll = rotate[2] * (np.pi / 180)
+        pitch = self.mathGl.deg2rad(rotate[0])
+        yaw = self.mathGl.deg2rad(rotate[1])
+        roll = self.mathGl.deg2rad(rotate[2])
 
-        rotationX = [ [1, 0, 0, 0],
-                      [0, cos(pitch), -sin(pitch), 0],
-                      [0, sin(pitch), cos(pitch), 0],
-                      [0, 0, 0, 1] ]
 
-        rotationY = [ [cos(yaw), 0, sin(yaw), 0],
-                      [0, 1, 0, 0],
-                      [-sin(yaw), 0, cos(yaw), 0],
-                      [0, 0, 0, 1] ]
+        rotation_x = [ [1, 0, 0, 0],
+                       [0, cos(pitch), -sin(pitch), 0],
+                       [0, sin(pitch), cos(pitch), 0],
+                       [0, 0, 0, 1] ]
 
-        rotationZ = [ [cos(roll), -sin(roll), 0, 0],
-                      [sin(roll), cos(roll), 0, 0],
-                      [0, 0, 1, 0],
-                      [0, 0, 0, 1] ]
+        rotation_y = [ [cos(yaw), 0, sin(yaw), 0],
+                       [0, 1, 0, 0],
+                       [-sin(yaw), 0, cos(yaw), 0],
+                       [0, 0, 0, 1] ]
 
-        first = self.mathGl.matrix_multiply(rotationX, rotationY)
-        second = self.mathGl.matrix_multiply(first, rotationZ)
+        rotation_z = [ [cos(roll), -sin(roll), 0, 0],
+                       [sin(roll), cos(roll), 0, 0],
+                       [0, 0, 1, 0],
+                       [0, 0, 0, 1] ]
 
-        return second
+        # first = self.mathGl.getMatricesProduct(rotation_x, rotation_y)
+        # result = self.mathGl.getMatricesProduct(first, rotation_z)
+        return self.mathGl.getMatricesProduct(self.mathGl.getMatricesProduct(rotation_x, rotation_y), rotation_z)
 
     ##  this function loads the model for it to be drawn
-    def loadModel(self, filename, translate, scale, rotate):
+    def loadModel(self, filename, translate = [0, 0, 0], scale = [1, 1, 1], rotate = [0, 0, 0]):
         model = Object(filename)
 
-        modelMatrix = self.createObjectMatrix(translate, scale, rotate)
-        rotationMatrix = self.createRotationMatrix(rotate)
+        model_matrix = self.createObjectMatrix(translate, scale, rotate)
+        rotation_matrix = self.createRotationMatrix(rotate)
 
         for face in model.faces :
             count_vertices = len(face)
+
             v0 = model.vertices[face[0][0] - 1]
             v1 = model.vertices[face[1][0] - 1]
             v2 = model.vertices[face[2][0] - 1]
 
-            v0 = self.transform(v0, modelMatrix)
-            v1 = self.transform(v1, modelMatrix)
-            v2 = self.transform(v2, modelMatrix)
-
             if count_vertices > 3 :
                 v3 = model.vertices[face[3][0] - 1]
-                v3 = self.transform(v3, modelMatrix)
+
+            v0 = self.transform(v0, model_matrix)
+            v1 = self.transform(v1, model_matrix)
+            v2 = self.transform(v2, model_matrix)
+
+            if count_vertices > 3 :
+                v3 = self.transform(v3, model_matrix)
 
             if self.current_texture :
                 vt0 = model.texture_coords[face[0][1] - 1]
@@ -331,13 +332,13 @@ class Render(object):
             vn1 = model.normals[face[1][2] - 1]
             vn2 = model.normals[face[2][2] - 1]
 
-            vn0 = self.dirTransform(vn0, rotationMatrix)
-            vn1 = self.dirTransform(vn1, rotationMatrix)
-            vn2 = self.dirTransform(vn2, rotationMatrix)
+            vn0 = self.dirTransform(vn0, rotation_matrix)
+            vn1 = self.dirTransform(vn1, rotation_matrix)
+            vn2 = self.dirTransform(vn2, rotation_matrix)
 
             if count_vertices > 3 :
                 vn3 = model.normals[face[3][2] - 1]
-                vn3 = self.dirTransform(vn3, rotationMatrix)
+                vn3 = self.dirTransform(vn3, rotation_matrix)
 
             self.triangle_barycentric_coordinates(v0, v1, v2, texture_coords = (vt0, vt1, vt2), normals = (vn0, vn1, vn2))
 
@@ -376,13 +377,13 @@ class Render(object):
         return c
 
     ##  this function draws triangles with barycentric coordinates
-    def triangle_barycentric_coordinates(self, A, B, C, intensity = 1, texture = None, texture_coords = ()):
+    def triangle_barycentric_coordinates(self, A, B, C, texture_coords = (), normals = (), n_color = color(1, 1, 1)):
         ## definding box limits
-        minX = min(A[0], B[0], C[0])
-        maxX = max(A[0], B[0], C[0])
+        minX = round(min(A[0], B[0], C[0]))
+        maxX = round(max(A[0], B[0], C[0]))
 
-        minY = min(A[1], B[1], C[1])
-        maxY = max(A[1], B[1], C[1])
+        minY = round(min(A[1], B[1], C[1]))
+        maxY = round(max(A[1], B[1], C[1]))
 
         for x in range(minX, maxX + 1) :
             for y in range(minY, maxY + 1) :
@@ -395,19 +396,19 @@ class Render(object):
                 if (u >= 0) and (v >= 0) and (w >=0) :
                     z = A[2] * u + B[2] * v + C[2] * w
 
-                    if z > self.zbuffer[y][x] and z <= 1 and z >= -1 :
-                        if self.current_texture :
+                    if z < self.zbuffer[y][x] and z <= 1 and z >= -1 :
+                        if self.current_shader:
                             r, g, b = self.current_shader(
                             self,
-                            verts = (A, B, C),
+                            vertices = (A, B, C),
                             barycentric_coords = (u, v, w),
                             texture_coords = texture_coords,
                             normals = normals,
-                            color = color(1, 1, 1)
+                            _color = n_color or self.current_color
                             )
 
-                        else :
-                            b, g, r = self.current_color
+                        else:
+                            b, g, r = n_color or self.current_color
 
                         self.current_color = color(r, g, b)
                         self.glVertex_coordinates(x, y)

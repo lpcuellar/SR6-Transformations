@@ -16,7 +16,7 @@ def phong(render, **kwargs):
     u, v, w = kwargs['barycentric_coords']
     ta, tb, tc = kwargs['texture_coords']
     na, nb, nc = kwargs['normals']
-    b, g, r = kwargs['color']
+    b, g, r = kwargs['_color']
 
     b /= 255
     g /= 255
@@ -54,7 +54,7 @@ def toon(render, **kwargs):
     u, v, w = kwargs['barycentric_coords']
     ta, tb, tc = kwargs['texture_coords']
     na, nb, nc = kwargs['normals']
-    b, g, r = kwargs['color']
+    b, g, r = kwargs['_color']
 
     b /= 255
     g /= 255
@@ -122,7 +122,7 @@ def static(render, **kwargs):
     u, v, w = kwargs['barycentric_coords']
     ta, tb, tc = kwargs['texture_coords']
     na, nb, nc = kwargs['normals']
-    b, g, r = kwargs['color']
+    b, g, r = kwargs['_color']
 
     b /= 255
     g /= 255
